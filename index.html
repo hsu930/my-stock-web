@@ -266,29 +266,46 @@
   async function fetchRealTimePrices() {
     const btn = document.querySelector('.btn-update');
     const originalText = btn.innerText;
-    btn.innerText = "⏳ 同步中...";
+    btn.innerText = "⏳ 正在同步...";
     btn.disabled = true;
 
     for (let s of portfolio) {
+        // 自動判斷台股與美股代碼
         let q = s.market === 'TW' ? s.id + '.TW' : s.id;
+        
+        // 如果是上櫃股票，有時候需要改用 .TWO，我們先嘗試 .TW
         try {
-            // 務必確認這裡的網址是你最新的 Render 網址
+            // 注意！這裡必須是你最新那個 Render 的網址 (snmd 那個)
             const res = await fetch(`https://my-stock-server-snmd.onrender.com/api/price/${q}`);
+            
+            if (!res.ok) throw new Error('網路回應不正確');
+            
             const data = await res.json();
             if (data.price) {
                 s.currentPrice = data.price;
-                // 每抓到一支，就立刻儲存並刷新畫面，這樣前端才會動！
+                console.log(`更新成功: ${s.name} 目前價格 ${data.price}`);
+                // 重要：每成功一支就立刻存檔並重新渲染畫面
                 saveAndRender(); 
             }
         } catch (e) {
-            console.error(q + " 抓取出錯", e);
+            console.error(`${q} 抓取失敗:`, e);
+            // 嘗試第二次：如果是台股抓不到，自動補測 .TWO (針對上櫃股票)
+            if (s.market === 'TW') {
+                try {
+                    const res2 = await fetch(`https://my-stock-server-snmd.onrender.com/api/price/${s.id}.TWO`);
+                    const data2 = await res2.json();
+                    if (data2.price) {
+                        s.currentPrice = data2.price;
+                        saveAndRender();
+                    }
+                } catch (e2) {}
+            }
         }
     }
 
     btn.innerText = originalText;
     btn.disabled = false;
 }
-  
 }
 
     saveAndRender();
