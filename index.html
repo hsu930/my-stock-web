@@ -263,28 +263,31 @@
         stockChart = new Chart(document.getElementById('stockChart'), { type: 'pie', data: { labels: portfolio.map(s=>s.name), datasets:[{data: portfolio.map(s=>getStockInfo(s).shares*(s.currentPrice||1)), backgroundColor:['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa']}] }, options: { maintainAspectRatio:false, plugins:{title:{display:true, text:'個股持股比例'}} }});
     }
 
-   async function fetchRealTimePrices() {
+  async function fetchRealTimePrices() {
     const btn = document.querySelector('.btn-update');
     const originalText = btn.innerText;
-    btn.innerText = "⏳ 正在同步報價...";
-    btn.disabled = true; // 防止重複點擊
+    btn.innerText = "⏳ 同步中...";
+    btn.disabled = true;
 
     for (let s of portfolio) {
-        // 判斷台股加 .TW，美股直接用 ID
         let q = s.market === 'TW' ? s.id + '.TW' : s.id;
         try {
-            // 這裡務必檢查網址是否與你 Render 的網址完全一致
+            // 務必確認這裡的網址是你最新的 Render 網址
             const res = await fetch(`https://my-stock-server-snmd.onrender.com/api/price/${q}`);
             const data = await res.json();
-            
             if (data.price) {
                 s.currentPrice = data.price;
-                console.log(`更新成功: ${s.name} - ${data.price}`);
-                saveAndRender(); // 每抓到一支就更新一次畫面，讓你有感覺在動
+                // 每抓到一支，就立刻儲存並刷新畫面，這樣前端才會動！
+                saveAndRender(); 
             }
         } catch (e) {
-            console.error(`${q} 抓取失敗:`, e);
+            console.error(q + " 抓取出錯", e);
         }
+    }
+
+    btn.innerText = originalText;
+    btn.disabled = false;
+}
     }
 
     btn.innerText = originalText;
