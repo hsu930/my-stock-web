@@ -2,151 +2,320 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的股票投資組合</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的股票旗艦儀表板 - 雲端同步版</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .stock-card { transition: transform 0.2s; }
-        .stock-card:active { transform: scale(0.98); }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #1a1a1a; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); padding: 20px; margin-bottom: 16px; }
+        input, select { -webkit-appearance: none; background-color: #f1f3f5; border: none; border-radius: 8px; padding: 10px; font-size: 14px; color: #1a1a1a; outline: none; }
+        .btn-add { background-color: #10b981; color: white; border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; transition: background 0.2s; }
+        .btn-add:hover { background-color: #059669; }
+        .table-header { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+        .table-row { font-size: 13px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; align-items: center; }
+        .table-row:last-child { border-bottom: none; }
+        .stock-symbol { font-size: 10px; color: #9ca3af; margin-top: 1px; }
+        .profit-positive { color: #ef4444; } /* 台股習慣：紅漲 */
+        .profit-negative { color: #10b981; } /* 台股習慣：綠跌 */
+        .text-num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen p-4">
-    <div class="max-w-md mx-auto">
-        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 shadow-lg mb-6 text-white text-center">
-            <h2 class="text-blue-100 text-sm mb-1 uppercase tracking-wider font-semibold">總資產估值 (TWD)</h2>
-            <div id="totalValue" class="text-4xl font-black mb-2">$ 0</div>
-            <div id="totalProfit" class="inline-block px-3 py-1 rounded-full bg-white/20 text-xs font-medium">--</div>
-        </div>
-
-        <div class="bg-white rounded-2xl p-5 shadow-sm mb-6 border border-slate-100">
-            <div class="flex p-1 bg-slate-100 rounded-xl mb-4">
-                <button id="btnTW" onclick="setMarket('tw')" class="flex-1 py-2 rounded-lg text-sm font-bold transition bg-white shadow-sm text-blue-600">台股</button>
-                <button id="btnUS" onclick="setMarket('us')" class="flex-1 py-2 rounded-lg text-sm font-bold transition text-slate-500">美股</button>
-            </div>
-            
-            <div class="space-y-3">
-                <input id="symbol" type="text" placeholder="代號 (如: 2330)" class="w-full bg-slate-50 border-none p-3 rounded-xl focus:ring-2 focus:ring-blue-500 transition outline-none">
-                <div class="flex gap-2">
-                    <input id="shares" type="number" placeholder="股數" class="flex-1 bg-slate-50 border-none p-3 rounded-xl outline-none">
-                    <input id="cost" type="number" placeholder="平均成本" class="flex-1 bg-slate-50 border-none p-3 rounded-xl outline-none">
+<body class="p-4 md:p-6">
+    <div class="max-w-7xl mx-auto">
+        
+        <div class="card bg-white">
+            <div class="flex justify-between items-start mb-3">
+                <h1 class="text-xl font-bold flex items-center gap-2">🚀 投資智慧儀表板</h1>
+                <div class="text-right">
+                    <p class="text-xs text-slate-500">未實現損益</p>
+                    <p id="headerProfit" class="text-sm font-bold text-slate-900 text-num">--元</p>
+                    <p class="text-[10px] text-slate-400">今年已實現 : $0</p>
                 </div>
-                <button onclick="addStock()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition shadow-md active:scale-95">新增持股</button>
+            </div>
+            <p id="headerTotalValue" class="text-3xl font-black text-slate-950 mb-4 text-num">NT$ 0</p>
+            <button onclick="loadStocks()" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl text-sm flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-[0.98] transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                更新即時報價並同步雲端
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="card flex flex-col items-center">
+                <h3 class="text-sm font-bold text-slate-600 mb-3 self-start">台美資產比例</h3>
+                <div class="w-40 h-40"><canvas id="ratioChart"></canvas></div>
+            </div>
+            <div class="card flex flex-col items-center">
+                <h3 class="text-sm font-bold text-slate-600 mb-3 self-start">個股持倉比例</h3>
+                <div class="w-40 h-40"><canvas id="stockChart"></canvas></div>
             </div>
         </div>
 
-        <div id="list" class="space-y-3">
+        <div class="card">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">🇹🇼 台股未實現部位</h2>
+                <button onclick="openAddModal('tw')" class="btn-add flex items-center gap-1">+ 新增台股持倉</button>
             </div>
+            <div class="overflow-x-auto">
+                <div class="min-w-[600px]">
+                    <div class="grid grid-cols-8 table-header text-center">
+                        <div class="col-span-2 text-left">名稱/代號</div>
+                        <div>持股數</div>
+                        <div>均價</div>
+                        <div>現價</div>
+                        <div>市值</div>
+                        <div>損益</div>
+                        <div>操作</div>
+                    </div>
+                    <div id="twList" class="space-y-1">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-[#fff5f5]/50 border border-red-100">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">🇺🇸 美股未實現部位</h2>
+                <button onclick="openAddModal('us')" class="btn-add flex items-center gap-1">+ 新增美股持倉</button>
+            </div>
+            <div class="overflow-x-auto">
+                <div class="min-w-[600px]">
+                    <div class="grid grid-cols-8 table-header text-center">
+                        <div class="col-span-2 text-left">名稱/代號</div>
+                        <div>持股數</div>
+                        <div>均價</div>
+                        <div>現價</div>
+                        <div>市值</div>
+                        <div>損益</div>
+                        <div>操作</div>
+                    </div>
+                    <div id="usList" class="space-y-1">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-slate-100/50 border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">💰 今年已實現紀錄</h2>
+                <button class="bg-slate-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-slate-700">+ 手動填寫紀錄</button>
+            </div>
+            <p class="text-center text-xs text-slate-400 py-6">尚無已實現紀錄</p>
+        </div>
+
+    </div>
+
+    <div id="addModal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl relative">
+            <button onclick="closeAddModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+            <h3 id="modalTitle" class="text-lg font-bold mb-5 text-slate-900">新增持股</h3>
+            <input type="hidden" id="modalType">
+            <div class="space-y-3">
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <label class="text-sm font-medium text-slate-600">市場</label>
+                    <select id="stockType" class="col-span-2">
+                        <option value="tw">🇹🇼 台灣股市</option>
+                        <option value="us">🇺🇸 美國股市</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <label class="text-sm font-medium text-slate-600">代號</label>
+                    <input type="text" id="stockSymbol" placeholder="如: 2330.TW" class="col-span-2">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <label class="text-sm font-medium text-slate-600">股數</label>
+                    <input type="number" id="stockShares" placeholder="0" class="col-span-2 text-num">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                    <label class="text-sm font-medium text-slate-600">成本</label>
+                    <input type="number" id="stockCost" placeholder="0.00" class="col-span-2 text-num">
+                </div>
+                <div class="pt-3">
+                    <button onclick="handleAddStock()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition active:scale-[0.98]">確認新增並同步雲端</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // 🛑 請確認這行網址是你 Render 的正確網址
-        const API_URL = 'https://my-stock-server-snmd.onrender.com';
-        let currentMarket = 'tw';
-        let stocks = [];
+        // 🛑🛑 核心關鍵：請換成你的 Render 實際網址，後面不要斜線
+        const API_BASE_URL = 'https://my-stock-server-snmd.onrender.com';
 
-        function setMarket(m) {
-            currentMarket = m;
-            const btnTW = document.getElementById('btnTW');
-            const btnUS = document.getElementById('btnUS');
-            const input = document.getElementById('symbol');
-            
-            if(m === 'tw') {
-                btnTW.className = "flex-1 py-2 rounded-lg text-sm font-bold transition bg-white shadow-sm text-blue-600";
-                btnUS.className = "flex-1 py-2 rounded-lg text-sm font-bold transition text-slate-500";
-                input.placeholder = "代號 (如: 2330)";
-            } else {
-                btnUS.className = "flex-1 py-2 rounded-lg text-sm font-bold transition bg-white shadow-sm text-blue-600";
-                btnTW.className = "flex-1 py-2 rounded-lg text-sm font-bold transition text-slate-500";
-                input.placeholder = "代號 (如: TSLA)";
+        let stocks = [];
+        let ratioChart, stockChart;
+
+        // 1. 初始化圖表 (保留你精美的圓餅圖)
+        function initCharts() {
+            const ctxRatio = document.getElementById('ratioChart').getContext('2d');
+            ratioChart = new Chart(ctxRatio, { type: 'doughnut', data: { labels: ['台股', '美股'], datasets: [{ data: [1, 0], backgroundColor: ['#3b82f6', '#ef4444'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false } } } });
+
+            const ctxStock = document.getElementById('stockChart').getContext('2d');
+            stockChart = new Chart(ctxStock, { type: 'doughnut', data: { labels: ['無資料'], datasets: [{ data: [1], backgroundColor: ['#e5e7eb'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false } } } });
+        }
+
+        // 2. 從雲端資料庫載入資料
+        async function loadStocks() {
+            const btn = document.querySelector('button[onclick="loadStocks()"]');
+            btn.innerHTML = '⚡️ 正在同步雲端資料...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/stocks`);
+                stocks = await response.json();
+                await renderDashboard();
+            } catch (error) {
+                console.error('同步失敗，請檢查 Render 是否醒著');
+                alert('連線失敗，可能是伺服器睡著了，請稍候再試。');
+            } finally {
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> 更新即時報價並同步雲端';
+                btn.disabled = false;
             }
         }
 
-        async function load() {
-            try {
-                const res = await fetch(`${API_URL}/api/stocks`);
-                stocks = await res.json();
-                render();
-            } catch (e) { console.error("讀取失敗"); }
-        }
+        // 3. 將股票存入雲端
+        async function handleAddStock() {
+            const symbol = document.getElementById('stockSymbol').value.toUpperCase().trim();
+            const shares = parseFloat(document.getElementById('stockShares').value);
+            const avgCost = parseFloat(document.getElementById('stockCost').value);
+            const type = document.getElementById('stockType').value;
 
-        async function addStock() {
-            let symbol = document.getElementById('symbol').value.toUpperCase().trim();
-            const shares = parseFloat(document.getElementById('shares').value);
-            const cost = parseFloat(document.getElementById('cost').value);
+            if (!symbol || isNaN(shares) || shares <= 0) return alert('代號或股數不完整');
 
-            if(!symbol || !shares) return alert("資訊不完整");
+            // 智能修正台股代號格式
+            let finalSymbol = symbol;
+            if (type === 'tw' && !finalSymbol.includes('.')) finalSymbol += '.TW';
 
-            // 自動處理代號
-            if(currentMarket === 'tw' && !symbol.includes('.')) symbol += '.TW';
-
-            const data = { id: Date.now().toString(), symbol, shares, avgCost: cost, type: currentMarket };
+            const newStock = { id: Date.now().toString(), symbol: finalSymbol, shares, avgCost: avgCost || 0, type };
 
             try {
-                await fetch(`${API_URL}/api/stocks`, {
+                await fetch(`${API_BASE_URL}/api/stocks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(newStock)
                 });
-                document.getElementById('symbol').value = '';
-                document.getElementById('shares').value = '';
-                document.getElementById('cost').value = '';
-                load();
-            } catch (e) { alert("新增失敗"); }
+                closeAddModal();
+                loadStocks(); // 重新整理清單
+            } catch (error) { alert('新增失敗，請確認網路連線'); }
         }
 
-        async function remove(id) {
-            if(!confirm("確定刪除？")) return;
-            await fetch(`${API_URL}/api/stocks/${id}`, { method: 'DELETE' });
-            load();
+        // 4. 從雲端刪除股票
+        async function deleteStock(id, symbol) {
+            if(!confirm(`確定要將 ${symbol} 從雲端投資組合中刪除嗎？`)) return;
+            try {
+                await fetch(`${API_BASE_URL}/api/stocks/${id}`, { method: 'DELETE' });
+                loadStocks();
+            } catch (error) { alert('刪除失敗'); }
         }
 
-        async function render() {
-            const list = document.getElementById('list');
-            let totalVal = 0;
-            let totalCost = 0;
+        // 5. 計算並渲染整個儀表板 (核心邏輯，換成抓即時價格)
+        async function renderDashboard() {
+            let totalTWDValue = 0;
+            let totalTWDCost = 0;
+            let twValue = 0, usValue = 0;
+            let stockLabels = [], stockData = [], stockColors = [];
 
-            const cards = await Promise.all(stocks.map(async (s) => {
-                let price = 0;
+            // 這裡抓取匯率，為了方便暫時寫死 32.5，之後可以升級抓即時匯率
+            const usdToTwd = 32.5; 
+
+            // 分開台美股進行抓價和排版
+            const twStocks = stocks.filter(s => s.type === 'tw');
+            const usStocks = stocks.filter(s => s.type === 'us');
+
+            const twHtml = await Promise.all(twStocks.map(s => renderStockRow(s, 1))); // 匯率 1
+            const usHtml = await Promise.all(usStocks.map(s => renderStockRow(s, usdToTwd))); // 換算 TWD
+
+            document.getElementById('twList').innerHTML = twHtml.join('') || '<p class="text-center text-xs text-slate-400 py-3 col-span-8">尚無台股持倉</p>';
+            document.getElementById('usList').innerHTML = usHtml.join('') || '<p class="text-center text-xs text-slate-400 py-3 col-span-8">尚無美股持倉</p>';
+
+            // 輔助函式：抓取單個股票現價並產生 HTML Row
+            async function renderStockRow(s, exchangeRate) {
+                let currentPrice = 0;
+                let stockName = s.symbol.split('.')[0]; // 暫用代號，抓不到真名
+
                 try {
-                    const res = await fetch(`${API_URL}/api/quote/${s.symbol}`);
+                    const res = await fetch(`${API_BASE_URL}/api/quote/${s.symbol}`);
                     const data = await res.json();
-                    price = data.price || 0;
-                } catch (e) {}
+                    currentPrice = data.price || 0;
+                } catch (e) { currentPrice = 0; }
 
-                const currentVal = price * s.shares;
-                const costVal = s.avgCost * s.shares;
-                totalVal += currentVal;
-                totalCost += costVal;
+                const currentVal = currentPrice * s.shares * exchangeRate;
+                const costVal = s.avgCost * s.shares * exchangeRate;
+                
+                totalTWDValue += currentVal;
+                totalTWDCost += costVal;
+                if(s.type === 'tw') twValue += currentVal; else usValue += currentVal;
+
+                // 準備圖表資料
+                stockLabels.push(s.symbol);
+                stockData.push(currentVal);
+                stockColors.push(s.type === 'tw' ? '#60a5fa' : '#f87171');
 
                 const profit = currentVal - costVal;
-                const profitColor = profit >= 0 ? 'text-red-500' : 'text-green-500';
+                const profitPercent = costVal > 0 ? (profit / costVal * 100).toFixed(2) : '0.00';
+                const profitClass = profit >= 0 ? 'profit-positive' : 'profit-negative';
                 const profitSign = profit >= 0 ? '+' : '';
 
+                // 保留你的表格排版
                 return `
-                    <div class="stock-card bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
-                        <div>
-                            <div class="font-black text-slate-800 text-lg">${s.symbol.replace('.TW','')}</div>
-                            <div class="text-xs text-slate-400 font-medium">${s.shares.toLocaleString()} 股 | 成本: ${s.avgCost}</div>
+                    <div class="grid grid-cols-8 table-row text-center text-slate-900">
+                        <div class="col-span-2 text-left flex flex-col pl-1">
+                            <span class="font-semibold text-sm">${stockName}</span>
+                            <span class="stock-symbol">${s.symbol}</span>
                         </div>
-                        <div class="text-right">
-                            <div class="font-bold text-slate-800">$${Math.round(currentVal).toLocaleString()}</div>
-                            <div class="text-xs font-bold ${profitColor}">${profitSign}${Math.round(profit).toLocaleString()} (${((profit/costVal)*100 || 0).toFixed(2)}%)</div>
-                            <button onclick="remove('${s.id}')" class="text-[10px] text-slate-300 hover:text-red-400 mt-1 uppercase tracking-tighter">Remove</button>
+                        <div class="text-num">${s.shares.toLocaleString()}</div>
+                        <div class="text-num">${s.avgCost.toFixed(s.type==='us'?2:1)}</div>
+                        <div class="text-num font-medium text-blue-600">${currentPrice.toFixed(s.type==='us'?2:1)}</div>
+                        <div class="text-num font-semibold">${Math.round(currentVal).toLocaleString()}</div>
+                        <div class="text-num font-bold ${profitClass}">${profitSign}${Math.round(profit).toLocaleString()}<br><span class="text-[10px] font-medium">${profitSign}${profitPercent}%</span></div>
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button class="text-slate-400 hover:text-blue-500">➕</button>
+                            <button onclick="deleteStock('${s.id}', '${s.symbol}')" class="text-slate-300 hover:text-red-500">🗑️</button>
                         </div>
                     </div>
                 `;
-            }));
+            }
 
-            list.innerHTML = cards.join('') || '<p class="text-center text-slate-300 py-10 text-sm">尚未加入任何持股</p>';
-            document.getElementById('totalValue').innerText = `$ ${Math.round(totalVal).toLocaleString()}`;
+            // 更新頂部總覽
+            document.getElementById('headerTotalValue').innerText = `NT$ ${Math.round(totalTWDValue).toLocaleString()}`;
             
-            const totalProfit = totalVal - totalCost;
-            const pColor = totalProfit >= 0 ? 'bg-red-500/20 text-red-200' : 'bg-green-500/20 text-green-200';
-            document.getElementById('totalProfit').className = `inline-block px-3 py-1 rounded-full text-xs font-medium ${pColor}`;
-            document.getElementById('totalProfit').innerText = `總損益: ${totalProfit >= 0 ? '+' : ''}${Math.round(totalProfit).toLocaleString()}`;
+            const totalProfit = totalTWDValue - totalTWDCost;
+            const totalProfitPercent = totalTWDCost > 0 ? (totalProfit / totalTWDCost * 100).toFixed(2) : '0.00';
+            const profitEl = document.getElementById('headerProfit');
+            profitEl.className = `text-sm font-bold text-num ${totalProfit >= 0 ? 'text-red-500' : 'text-green-600'}`;
+            profitEl.innerText = `${totalProfit >= 0 ? '+' : ''}${Math.round(totalProfit).toLocaleString()} 元 (${totalProfit >= 0 ? '+' : ''}${totalProfitPercent}%)`;
+
+            // 更新圓餅圖
+            updateCharts(twValue, usValue, stockLabels, stockData, stockColors);
         }
 
-        load();
+        function updateCharts(twV, usV, labels, data, colors) {
+            // 更新比例圖
+            ratioChart.data.datasets[0].data = [twV, usV];
+            if(twV === 0 && usV === 0) ratioChart.data.datasets[0].data = [1, 0];
+            ratioChart.update();
+
+            // 更新個股圖
+            stockChart.data.labels = labels.length ? labels : ['無資料'];
+            stockChart.data.datasets[0].data = data.length ? data : [1];
+            stockChart.data.datasets[0].backgroundColor = colors.length ? colors : ['#e5e7eb'];
+            stockChart.update();
+        }
+
+        // 彈窗操作
+        function openAddModal(market) {
+            document.getElementById('stockType').value = market;
+            document.getElementById('modalTitle').innerText = `新增${market==='tw'?'台股':'美股'}持倉`;
+            document.getElementById('stockSymbol').placeholder = market==='tw'?'如: 2330':'如: TSLA';
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+        function closeAddModal() {
+            document.getElementById('addModal').classList.add('hidden');
+            document.querySelectorAll('#addModal input').forEach(i => i.value = '');
+        }
+
+        // 初始執行
+        initCharts();
+        loadStocks(); // 網頁打開自動連線雲端
     </script>
 </body>
 </html>
