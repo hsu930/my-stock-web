@@ -27,95 +27,108 @@
     </div>
 
     <script>
-        // 🛑 重要：請把下面這行換成你在 Render 看到的實際網址
-        const API_BASE_URL = 'https://my-stock-server-snmd.onrender.com';
+       // 🛑 請記得換成你的 Render 實際網址
+const API_BASE_URL = 'https://my-stock-server-snmd.onrender.com';
 
-        let stocks = [];
+let stocks = [];
 
-        // 1. 從雲端讀取資料
-        async function loadStocks() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/stocks`);
-                stocks = await response.json();
-                renderStocks();
-            } catch (error) {
-                console.error('讀取失敗:', error);
-            }
-        }
+// 1. 從雲端讀取資料
+async function loadStocks() {
+    const listDiv = document.getElementById('stockList');
+    listDiv.innerHTML = '<p class="text-center text-gray-400">連線雲端中...</p>';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/stocks`);
+        stocks = await response.json();
+        renderStocks();
+    } catch (error) {
+        listDiv.innerHTML = '<p class="text-center text-red-400">讀取失敗，請檢查後端網址</p>';
+    }
+}
 
-        // 2. 新增股票到雲端
-        async function handleAddStock() {
-            const symbol = document.getElementById('stockSymbol').value.toUpperCase();
-            const shares = parseFloat(document.getElementById('stockShares').value);
-            const avgCost = parseFloat(document.getElementById('stockCost').value);
+// 2. 新增股票
+async function handleAddStock() {
+    const symbol = document.getElementById('stockSymbol').value.toUpperCase().trim();
+    const shares = parseFloat(document.getElementById('stockShares').value);
+    const avgCost = parseFloat(document.getElementById('stockCost').value);
 
-            if (!symbol || !shares) return alert('請填寫完整資訊');
+    if (!symbol || isNaN(shares)) return alert('請輸入代號與股數');
 
-            const newStock = { id: Date.now().toString(), symbol, shares, avgCost };
+    const newStock = { 
+        id: Date.now().toString(), 
+        symbol, 
+        shares: shares || 0, 
+        avgCost: avgCost || 0 
+    };
 
-            try {
-                await fetch(`${API_BASE_URL}/api/stocks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newStock)
-                });
-                document.getElementById('stockSymbol').value = '';
-                document.getElementById('stockShares').value = '';
-                document.getElementById('stockCost').value = '';
-                loadStocks(); // 重新整理清單
-            } catch (error) {
-                alert('新增失敗');
-            }
-        }
+    try {
+        await fetch(`${API_BASE_URL}/api/stocks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newStock)
+        });
+        // 清空輸入框
+        document.querySelectorAll('input').forEach(i => i.value = '');
+        loadStocks(); 
+    } catch (error) {
+        alert('新增失敗');
+    }
+}
 
-        // 3. 從雲端刪除股票
-        async function deleteStock(id) {
-            try {
-                await fetch(`${API_BASE_URL}/api/stocks/${id}`, { method: 'DELETE' });
-                loadStocks();
-            } catch (error) {
-                alert('刪除失敗');
-            }
-        }
-
-        // 4. 顯示股票清單並計算價格
-        async function renderStocks() {
-            const listDiv = document.getElementById('stockList');
-            listDiv.innerHTML = '<p class="text-center text-gray-400">讀取中...</p>';
-            
-            let totalTWD = 0;
-
-            const html = await Promise.all(stocks.map(async (s) => {
-                let currentPrice = 0;
-                try {
-                    const res = await fetch(`${API_BASE_URL}/api/quote/${s.symbol}`);
-                    const data = await res.json();
-                    currentPrice = data.price;
-                } catch (e) { currentPrice = 0; }
-
-                const value = currentPrice * s.shares;
-                totalTWD += value;
-
-                return `
-                    <div class="flex justify-between items-center p-3 border rounded shadow-sm">
-                        <div>
-                            <p class="font-bold">${s.symbol}</p>
-                            <p class="text-xs text-gray-500">${s.shares} 股 | 現價: ${currentPrice}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="font-bold text-blue-500">$${Math.round(value).toLocaleString()}</p>
-                            <button onclick="deleteStock('${s.id}')" class="text-xs text-red-400">刪除</button>
-                        </div>
-                    </div>
-                `;
-            }));
-
-            listDiv.innerHTML = html.join('') || '<p class="text-center text-gray-400">目前沒有股票</p>';
-            document.getElementById('totalValue').innerText = `$${Math.round(totalTWD).toLocaleString()}`;
-        }
-
-        // 初始載入
+// 3. 刪除股票
+async function deleteStock(id) {
+    if(!confirm('確定要刪除嗎？')) return;
+    try {
+        await fetch(`${API_BASE_URL}/api/stocks/${id}`, { method: 'DELETE' });
         loadStocks();
+    } catch (error) {
+        alert('刪除失敗');
+    }
+}
+
+// 4. 渲染畫面 (修正 $非數值 問題)
+async function renderStocks() {
+    const listDiv = document.getElementById('stockList');
+    let totalTWD = 0;
+
+    const htmlPromises = stocks.map(async (s) => {
+        let currentPrice = 0;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/quote/${s.symbol}`);
+            const data = await res.json();
+            currentPrice = data.price || 0;
+        } catch (e) {
+            currentPrice = 0;
+        }
+
+        const value = currentPrice * s.shares;
+        totalTWD += value;
+
+        return `
+            <div class="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-lg shadow-sm mb-2">
+                <div>
+                    <p class="font-bold text-gray-800">${s.symbol}</p>
+                    <p class="text-xs text-gray-500">${s.shares.toLocaleString()} 股 | 現價: ${currentPrice || '抓取中'}</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold text-blue-600">$${Math.round(value).toLocaleString()}</p>
+                    <button onclick="deleteStock('${s.id}')" class="text-xs text-red-300 hover:text-red-500 transition">刪除</button>
+                </div>
+            </div>
+        `;
+    });
+
+    const htmlArray = await Promise.all(htmlPromises);
+    listDiv.innerHTML = htmlArray.join('') || '<p class="text-center text-gray-400 py-4">目前沒有股票，請新增資料</p>';
+    
+    // 更新總市值文字
+    const totalEl = document.getElementById('totalValue');
+    totalEl.innerText = `$${Math.round(totalTWD).toLocaleString()}`;
+}
+
+// 初始載入
+loadStocks();
+
     </script>
 </body>
 </html>
